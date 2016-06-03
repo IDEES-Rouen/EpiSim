@@ -7,89 +7,102 @@ turtles-own
  recovery-time
  node-clustering-coefficient
  perco
+ tagged?
 ]
 
 links-own [rewired?                    ;; keeps track of whether the link has been rewired or not
           ]
-   
-globals[S I R list-I maxI N-R cumul-R cumul-R-% IQ-I-list IQ-I R0
+
+globals[S-prop I-prop R-prop S I R  list-I maxI N-R cumul-R cumul-R-% IIQ-list IIQ R0
        perco?
        count-perco
-       clustering-coefficient                 
-       average-path-length                  
+       clustering-coefficient
+       average-path-length
        number-rewired
        network-data
        group1
+       TimeofMaxI
+       TimeToReachAllNodes
+       Duration
+
+       simulation-started?
        ]
 ;************************************************************************;
 to set-globals
-set S count turtles with [state = "S"] / count turtles * 100
-set I count turtles with [state = "I"] / count turtles * 100
-set R count turtles with [state = "R"] / count turtles * 100
-set list-I lput I list-I
-set cumul-R lput (last cumul-R + (R * count turtles / 100)) cumul-R
-set R0 nbre-moyen-contacts * pInfection / pGuerison
+set S count turtles with [state = "S"]
+set I count turtles with [state = "I"]
+set R count turtles with [state = "R"]
+
+set S-prop S / count turtles * 100
+set I-prop I / count turtles * 100
+set R-prop R / count turtles * 100
+set list-I lput I-prop list-I
+set cumul-R lput (last cumul-R + R ) cumul-R
+set R0 nbre-moyen-contacts * alpha / beta
 set perco? 0
 end
 ;************************************************************************;
 to setup
   clear-all
-  
+
+
+  set simulation-started? false
+
   ifelse network = "none"
-         [crt number-of-nodes
+         [crt TotalPop
               [set state "S"
                set infected-time 0
                if Guerison = "Temps fixe"
-                  [set recovery-time (1 / pGuerison)]
+                  [set recovery-time (1 / beta)]
                if Guerison = "Temps aléatoire"
                   [while [recovery-time = 0]
-                         [set recovery-time (random-poisson (1 / pGuerison))]
+                         [set recovery-time (random-poisson (1 / beta))]
                   ]
                setxy random-xcor random-ycor
                set shape "bug"
                ]
          ]
          [setup-network]
-  
- 
-  ask turtles 
-    [become-susceptible 
+
+
+  ask turtles
+    [become-susceptible
      if Guerison = "Temps fixe"
-      [set recovery-time (1 / pGuerison)]
+      [set recovery-time (1 / beta)]
      if Guerison = "Temps aléatoire"
       [while [recovery-time = 0]
-      [set recovery-time (random-poisson (1 / pGuerison))]
+      [set recovery-time (random-poisson (1 / beta))]
       ]
     ]
-  
+
   ask n-of nbre_inf_INI turtles
     [ become-infected ]
   set list-I (list)
   set cumul-R (list 0)
   set-globals
   ask links [ set color white ]
-  reset-ticks
+reset-ticks
   compute-average-shortest-path-length
   find-clustering-coefficient
 end
 ;************************************************************************;
 to setup-clean
   ask turtles
-    [ become-susceptible 
-      
+    [ become-susceptible
+
         if Guerison = "Temps fixe"
-      [set recovery-time (1 / pGuerison)]
+      [set recovery-time (1 / beta)]
      if Guerison = "Temps aléatoire"
       [while [recovery-time = 0]
-      [set recovery-time (random-poisson (1 / pGuerison))]
+      [set recovery-time (random-poisson (1 / beta))]
       ]
-    ]    
+    ]
   ask n-of nbre_inf_INI turtles
     [ become-infected ]
-    
+
   set-globals
   ask links [ set color white ]
-  
+
   reset-ticks
 end
 
@@ -98,15 +111,15 @@ end
  to setup-network
   while [perco? = 0]
         [clear-all
-         
+
          if network = "clustered"
           [setup-nodes
            setup-spatially-clustered-network
           ]
         if network = "scale free"
-        [setup-scale-free 
+        [setup-scale-free
         ]
-        if network = "small world 4" or network = "small world 6" or network = "small world 8" or network = "small world 10" or network = "small world 12" 
+        if network = "small world 4" or network = "small world 6" or network = "small world 8" or network = "small world 10" or network = "small world 12"
            [setup-small-world
            ]
         set count-perco 0
@@ -116,26 +129,26 @@ end
                 percolation ;;; la procédure de percolation ré-initialise le réseau jusqu'à ce qu'il soit totalement connecté
               ]
            ]
-        
-        ]     
-  end 
+
+        ]
+  end
 
 ;**************************************************************************************;
 ;***********************CLUSTERED NETWORK**********************************************;
 to setup-nodes
   set-default-shape turtles "circle"
-  crt number-of-nodes
+  crt TotalPop
   [
     ; for visual reasons, we don't put any nodes *too* close to the edges
     setxy (random-xcor ) (random-ycor )
-    
- 
-    
+
+
+
   ]
 end
 
 to setup-spatially-clustered-network
-  let num-links (average-node-degree * number-of-nodes) / 2
+  let num-links (average-node-degree * TotalPop) / 2
   while [count links < num-links ]
   [
     ask one-of turtles
@@ -149,7 +162,7 @@ end
 
 ;**************************************************************************************;
 ;***********************SCALE FREE NETWORK**********************************************;
-to setup-scale-free 
+to setup-scale-free
 set-default-shape turtles "circle"
 ;; make the initial network of two turtles and an edge
   make-node nobody        ;; first node, unattached
@@ -158,8 +171,8 @@ set-default-shape turtles "circle"
   ask links [ set color gray ]
   make-node find-partner         ;; find partner & use it as attachment
                                  ;; point for new node
-  
-  repeat number-of-nodes [make-node find-partner]  
+
+  repeat TotalPop [make-node find-partner]
   ask links [ set color gray ]
 end
 
@@ -213,14 +226,14 @@ set-default-shape turtles "circle"
   if network = "small world 8" [wire-them-av-degree8]
   if network = "small world 10" [wire-them-av-degree10]
   if network = "small world 12" [wire-them-av-degree12]
-  repeat (%rewired * number-of-nodes / 100) [rewire-one]   
-end  
+  repeat (%rewired * TotalPop / 100) [rewire-one]
+end
 ;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Network Creation ;;
 ;;;;;;;;;;;;;;;;;;;;;;;
 
 to make-turtles
-  crt number-of-nodes [ set color gray + 2 ]
+  crt TotalPop [ set color gray + 2 ]
   ;; arrange them in a circle in order by who number
   layout-circle (sort turtles) max-pxcor - 1
 end
@@ -333,7 +346,7 @@ end
 to rewire-one
 
   ;; make sure num-turtles is setup correctly else run setup first
-  if count turtles != number-of-nodes [
+  if count turtles != TotalPop [
     setup
   ]
 
@@ -359,7 +372,7 @@ to rewire-one
    ; do-plotting
   ]
   [ user-message "all edges have already been rewired once" ]
-end 
+end
 
 ;****************PERCOLATION******************
 ;********************************************
@@ -369,7 +382,7 @@ ifelse not any? link-neighbors with [perco = 0]
         if count turtles with [perco = 1] = count turtles
            [set perco? 1]
         ]
-       [ 
+       [
          ask link-neighbors with [perco = 0]
          [set perco 1
           percolation
@@ -385,12 +398,13 @@ end
 ;**************************************************************************************;
 to go
   set-globals
-  
+  set simulation-started? true
+
   ask turtles with [state = "S"]
     [ifelse interactions = "explicit" [transition-S-I-explicit-contacts] [transition-S-I-implicit-contacts]]
   ask turtles with [state = "I"]
     [transition-I-R]
-  
+
 ask turtles [
       if network = "none"
          [if not IndividualsStatic?
@@ -402,14 +416,29 @@ ask turtles [
         [become-resistant]
     ]
     do-plotting
-    if condition-stop? 
+    if condition-stop?
        [calculate-outputs
         stop]
-    
+
     test-infection-start
-    
+
+
+    ;; update max I
+    find-local-maxima-I
+
   tick
 end
+
+to find-local-maxima-I
+  let newI count turtles with [state = "I"]
+  if MaxI < newI
+  [
+    set MaxI I
+    set TimeofMaxI (ticks - min [tagged?] of turtles)
+  ]
+
+end
+
 
 ;**************************************************************************************;
 to test-infection-start
@@ -431,6 +460,8 @@ end
 to become-infected  ;; turtle procedure
   set state "I"
   set infected-time 0
+  if simulation-started? = true[
+  set tagged? ticks]
   set color red
 end
 
@@ -464,7 +495,7 @@ set my-neighbours get-my-neighbours my-neighbours link-turtles
 foreach sort my-neighbours
         [ifelse [state] of ? = "I"
                 [let p random-float 1
-                 ifelse p < (pInfection * pas_de_temps)
+                 ifelse p < (alpha * IntegrationStep)
                         [set state "SI"]
                         []
                  ]
@@ -475,10 +506,10 @@ foreach sort my-neighbours
 end
 
 to transition-S-I-implicit-contacts
-let bool (random-float 1 < nbre-moyen-contacts * pInfection * (I / 100) * pas_de_temps) 
-if (neighbourhood = "local") [set bool (random-float 1 < nbre-moyen-contacts * pInfection * prop-infected-neighbours * pas_de_temps)]
+let bool (random-float 1 < nbre-moyen-contacts * alpha * (I / 100) * IntegrationStep)
+if (neighbourhood = "local") [set bool (random-float 1 < nbre-moyen-contacts * alpha * prop-infected-neighbours * IntegrationStep)]
 if bool
-[ 
+[
   set state "SI"
 ]
 end
@@ -496,13 +527,13 @@ end
 to transition-I-R
 ifelse Guerison = "Probabilité"
        [let p random-float 1
-        ifelse p < ((pGuerison) * pas_de_temps)
+        ifelse p < ((beta) * IntegrationStep)
                [set state "IR"]
                []
        ]
-       [set infected-time (infected-time + (1 * pas_de_temps)) 
+       [set infected-time (infected-time + (1 * IntegrationStep))
         if infected-time >= recovery-time
-           [set state "IR"]           
+           [set state "IR"]
        ]
 
 end
@@ -519,29 +550,29 @@ ifelse network = "none"
                        [set my-neighbours a
                         report my-neighbours]
                        [set my-neighbours n-of b a
-                        report my-neighbours 
+                        report my-neighbours
                        ]
                ]
        ]
        [let nbContact 0
         set nbContact (random-poisson nbre-moyen-contacts)
-        ifelse nbContact <= count(link-turtles) 
+        ifelse nbContact <= count(link-turtles)
                [set my-neighbours n-of nbContact link-turtles
                ]
                [set my-neighbours link-turtles
                ]
         report my-neighbours
        ]
-end  
+end
 ;**************************************************************************************;
 to do-plotting
 set-current-plot "Suivi des populations"
-set-current-plot-pen "S"
-plotxy ticks S
-set-current-plot-pen "I"
-plotxy ticks I
-set-current-plot-pen "R"
-plotxy ticks R
+set-current-plot-pen "S-prop"
+plotxy ticks S-prop
+set-current-plot-pen "I-prop"
+plotxy ticks I-prop
+set-current-plot-pen "R-prop"
+plotxy ticks R-prop
 end
 ;**************************************************************************************;
 to plot-nbre-contacts
@@ -551,15 +582,19 @@ histogram n
 end
 ;**************************************************************************************;
 to calculate-outputs
-set maxI max list-I
+;;set maxI max list-I
 set N-R last cumul-R
 set cumul-R-% (list)
 foreach cumul-R
         [set cumul-R-% lput (? / N-R * 100) cumul-R-%
         ]
-set IQ-I-list filter [? <= 25] cumul-R-%
-set IQ-I-list filter [? >= 75] cumul-R-%
-set IQ-I length IQ-I-list 
+set IIQ-list filter [? <= 25] cumul-R-%
+set IIQ-list filter [? >= 75] cumul-R-%
+set IIQ length IIQ-list
+
+set duration (ticks - min [tagged?] of turtles)
+set TimeToReachAllNodes (max [tagged?] of turtles - min [tagged?] of turtles)
+
 end
 
 
@@ -600,8 +635,8 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to compute-average-shortest-path-length
-set average-path-length network:mean-link-path-length turtles links 
-end 
+set average-path-length network:mean-link-path-length turtles links
+end
 
 
 ;**************************************************************************************;
@@ -625,18 +660,18 @@ while [ not file-at-end? ]
 file-close
 set-nodes
 set-links
-  ]  
- 
-  ask turtles 
-    [become-susceptible 
+  ]
+
+  ask turtles
+    [become-susceptible
      if Guerison = "Temps fixe"
-      [set recovery-time (1 / pGuerison)]
+      [set recovery-time (1 / beta)]
      if Guerison = "Temps aléatoire"
       [while [recovery-time = 0]
-      [set recovery-time (random-poisson (1 / pGuerison))]
+      [set recovery-time (random-poisson (1 / beta))]
       ]
     ]
-  
+
   ask n-of nbre_inf_INI turtles
     [ become-infected ]
   set list-I (list)
@@ -646,14 +681,14 @@ set-links
   reset-ticks
  ; compute-average-shortest-path-length
  ; find-clustering-coefficient
-  
+
 
 
 end
 
 to set-nodes
 foreach network-data
-   [if not any? turtles with [id = (first ?)] 
+   [if not any? turtles with [id = (first ?)]
       [ crt 1 [set id (first ?)
                set xcor item 1 ?
                set ycor item 2 ?]
@@ -686,7 +721,7 @@ let file user-new-file
     file-open file
     ;; record the initial turtle data
     write-to-file
-   
+
   ]
 
 end
@@ -699,7 +734,7 @@ to write-to-file
           ]
     ]
   ]
- file-close  
+ file-close
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -766,13 +801,13 @@ NIL
 SLIDER
 7
 221
-176
+179
 254
-number-of-nodes
-number-of-nodes
+TotalPop
+TotalPop
 0
 10000
-1000
+500
 500
 1
 NIL
@@ -786,8 +821,8 @@ SLIDER
 average-node-degree
 average-node-degree
 1
-number-of-nodes - 1
-8
+TotalPop - 1
+5
 1
 1
 NIL
@@ -813,8 +848,8 @@ SLIDER
 721
 522
 754
-pGuerison
-pGuerison
+beta
+beta
 0
 1
 0.45
@@ -838,8 +873,8 @@ SLIDER
 669
 850
 702
-pInfection
-pInfection
+alpha
+alpha
 0
 1
 1
@@ -851,10 +886,10 @@ HORIZONTAL
 SLIDER
 224
 18
-396
+408
 51
-pas_de_temps
-pas_de_temps
+IntegrationStep
+IntegrationStep
 0
 1
 0.01
@@ -894,9 +929,9 @@ true
 true
 "" ""
 PENS
-"S" 1.0 0 -10899396 true "" ""
-"I" 1.0 0 -2674135 true "" ""
-"R" 1.0 0 -13345367 true "" ""
+"S-prop" 1.0 0 -10899396 true "" ""
+"I-prop" 1.0 0 -2674135 true "" ""
+"R-prop" 1.0 0 -13345367 true "" ""
 
 MONITOR
 1251
@@ -904,7 +939,7 @@ MONITOR
 1308
 513
 NIL
-I
+I-prop
 17
 1
 11
@@ -951,21 +986,21 @@ maxI
 MONITOR
 992
 466
-1049
+1059
 511
 NIL
-IQ-I
+IIQ
 1
 1
 11
 
 MONITOR
 1252
-414
+417
 1309
-459
+462
 NIL
-R
+R-prop
 1
 1
 11
@@ -976,7 +1011,7 @@ MONITOR
 1225
 768
 Tps virémie
-1 / pGuerison
+1 / beta
 1
 1
 11
@@ -989,7 +1024,7 @@ CHOOSER
 network
 network
 "clustered" "scale free" "small world 4" "small world 6" "small world 8" "small world 12" "none"
-6
+0
 
 MONITOR
 7
@@ -1123,7 +1158,7 @@ TEXTBOX
 309
 388
 341
-Paramètre pour réorganiser le réseau \"Small World\" 
+Paramètre pour réorganiser le réseau \"Small World\"
 10
 0.0
 1
@@ -1302,7 +1337,7 @@ TEXTBOX
 1322
 426
 1472
-444
+451
 % d'individus ayant été infectés
 10
 0.0
@@ -1418,6 +1453,39 @@ Degré moyen du réseau (nombre moyen de voisins)
 10
 0.0
 1
+
+MONITOR
+1251
+519
+1337
+564
+NIL
+timeOfMaxI
+17
+1
+11
+
+MONITOR
+1251
+569
+1318
+614
+NIL
+duration
+17
+1
+11
+
+MONITOR
+995
+564
+1152
+609
+NIL
+TimeToReachAllNodes
+17
+1
+11
 
 @#$#@#$#@
 @#$#@#$#@
@@ -1704,7 +1772,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.0
+NetLogo 5.3.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
